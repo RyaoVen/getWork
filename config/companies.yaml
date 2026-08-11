@@ -246,16 +246,113 @@ sources:
       department: "firstDepName"
 
   # ---- 以下站点岗位 API 结构尚未完全逆向，先注册，待补充 response_match/fields ----
+  # ---- 美团（getJobList 直调，纯 httpx 可通，列表含职责/要求） ----
   - key: meituan
     name: "美团校招"
     url: "https://zhaopin.meituan.com/web/campus"
-    strategy: dynamic
+    strategy: platform
     api:
-      response_match: "recruit"
+      url: "https://zhaopin.meituan.com/api/official/job/getJobList"
+      method: POST
+      body:
+        page: { pageNo: 1, pageSize: 10 }
+        jobShareType: "1"
+        keywords: ""
+        cityList: []
+        department: []
+        jfJgList: []
+        jobType: [ { code: "1", subCode: [] }, { code: "2", subCode: [] } ]
+        typeCode: []
+        specialCode: []
+      page_param: "pageNo"
+      page_size: 10
+      page_size_key: "page.pageSize"
+      body_page_key: "page.pageNo"
       data_path: "data.list"
+      total_path: "data.page.totalCount"
+    fields:
+      title: "name"
+      location: "cityList.name"
+      department: "department.name"
+      job_type: "jobFamily"
+      publish_date: "refreshTime"
+      description: "jobDuty"
+      requirement: "jobRequirement"
+      apply_url: "https://zhaopin.meituan.com/web/position/detail?jobUnionId={jobUnionId}&highlightType=campus"
+
+  # ---- 滴滴（Moka jobs/v2 需解密：AES-128-CBC, key=necromancer） ----
+  - key: didi
+    name: "滴滴校招"
+    url: "https://app.mokahr.com/apply/didiglobal/6222#/jobs?zhineng%5B0%5D=48460"
+    strategy: platform
+    platform: moka
+    api:
+      url: "https://app.mokahr.com/api/outer/ats-apply/website/jobs/v2"
+      method: POST
+      headers:
+        referer: "https://app.mokahr.com/apply/didiglobal/6222"
+      body:
+        orgId: "didiglobal"
+        siteId: 6222
+        limit: 30
+        offset: 0
+        needStat: true
+        jobIdTopList: []
+        zhinengIds: [48460]
+        customFields: {}
+        site: "social"
+        locale: "zh-CN"
+      page_param: "offset"
+      page_size: 30
+      page_size_key: "limit"
+      body_page_key: "offset"
+      offset_mode: true
+      decrypt: "moka"
+      data_path: "data.jobs"
+      total_path: "data.jobStats.total"
     fields:
       title: "title"
-      location: "location"
+      location: "locations.cityName"
+      job_type: "zhineng.name"
+      publish_date: "publishedAt"
+      apply_url: "https://app.mokahr.com/apply/didiglobal/6222"
+
+  # ---- 唯品会（Moka jobs/v2 需解密） ----
+  - key: vipshop
+    name: "唯品会校招"
+    url: "https://app-tc.mokahr.com/campus-recruitment/vipshophr/8015?sourceToken=d7b00ea2471aaddd55b3f402bb4fcc19#/jobs"
+    strategy: platform
+    platform: moka
+    api:
+      url: "https://app-tc.mokahr.com/api/outer/ats-apply/website/jobs/v2"
+      method: POST
+      headers:
+        referer: "https://app-tc.mokahr.com/campus-recruitment/vipshophr/8015"
+      body:
+        orgId: "vipshophr"
+        siteId: 8015
+        limit: 30
+        offset: 0
+        needStat: true
+        jobIdTopList: []
+        zhinengIds: []
+        customFields: {}
+        site: "social"
+        locale: "zh-CN"
+      page_param: "offset"
+      page_size: 30
+      page_size_key: "limit"
+      body_page_key: "offset"
+      offset_mode: true
+      decrypt: "moka"
+      data_path: "data.jobs"
+      total_path: "data.jobStats.total"
+    fields:
+      title: "title"
+      location: "locations.cityName"
+      job_type: "zhineng.name"
+      publish_date: "publishedAt"
+      apply_url: "https://app-tc.mokahr.com/campus-recruitment/vipshophr/8015"
 
   - key: tongcheng
     name: "同程校招"
@@ -268,13 +365,70 @@ sources:
       title: "positionName"
       location: "workCity"
 
+  # ---- 携程（getJobAd category=1 直调，含职责/要求） ----
   - key: ctrip
     name: "携程校招"
     url: "https://job.ctrip.com/#/campus/jobList"
-    strategy: dynamic
+    strategy: platform
     api:
-      response_match: "getJobAd"
-      data_path: "data.list"
+      url: "https://job.ctrip.com/api/hrrecruit/getJobAd"
+      method: POST
+      headers:
+        referer: "https://job.ctrip.com/#/campus/jobList"
+      body:
+        condition:
+          fromId: []
+          keyword: ""
+          kind: []
+          country: []
+          city: []
+          bucode: []
+          jobFamilyCode: []
+          jobFamilyGroupCode: []
+          category: 1
+        pager: { index: "1", size: "100" }
+        head: { language: "zh_CN", version: "1" }
+      page_param: "index"
+      page_size: 100
+      page_size_key: "pager.size"
+      body_page_key: "pager.index"
+      data_path: "retValue.recruitJobAdList"
+      total_path: "retValue.total"
     fields:
-      title: "title"
-      location: "city"
+      title: "jobTitle"
+      location: "cityName"
+      description: "duty"
+      requirement: "requirements"
+      publish_date: "publishDate"
+      job_type: "jobFamilyGroupName"
+
+  # ---- 百度（getPostListNew 表单直调，含要求/描述） ----
+  - key: baidu
+    name: "百度校招"
+    url: "https://talent.baidu.com/jobs/list?recruitType=INTERN"
+    strategy: platform
+    api:
+      url: "https://talent.baidu.com/httservice/getPostListNew"
+      method: POST
+      form: true
+      headers:
+        referer: "https://talent.baidu.com/jobs/list?recruitType=INTERN"
+      body:
+        recruitType: "INTERN"
+        pageSize: 20
+        keyWord: ""
+        curPage: 1
+        projectType: ""
+      page_param: "curPage"
+      page_size: 20
+      page_size_key: "pageSize"
+      body_page_key: "curPage"
+      data_path: "data.list"
+      total_path: "data.total"
+    fields:
+      title: "name"
+      location: "workPlace"
+      description: "workContent"
+      requirement: "serviceCondition"
+      publish_date: "publishDate"
+      job_type: "postType"

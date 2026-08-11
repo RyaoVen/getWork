@@ -14,6 +14,32 @@ from ..models import JobRecord
 from .base import Crawler, UA, dig, job_from_fields
 
 
+def _set_nested(obj: dict, dotted: str, value) -> None:
+    """把 a.b.c 点分 key 写进嵌套字典。"""
+    parts = dotted.split(".")
+    cur = obj
+    for p in parts[:-1]:
+        if not isinstance(cur.get(p), dict):
+            cur[p] = {}
+        cur = cur[p]
+    cur[parts[-1]] = value
+
+
+def _decrypt_moka(data: dict) -> dict:
+    """解密 Moka jobs/v2 响应：AES-128-CBC，key=necromancer(utf8)，IV 常量。"""
+    import base64
+    import json
+
+    from Crypto.Cipher import AES
+    from Crypto.Util.Padding import unpad
+
+    key = data["necromancer"].encode("utf-8")
+    iv = b"de7c21ed8d6f50fe"
+    cipher = AES.new(key, AES.MODE_CBC, iv)
+    raw = unpad(cipher.decrypt(base64.b64decode(data["data"])), 16)
+    return json.loads(raw)
+
+
 class PlatformCrawler(Crawler):
     MAX_PAGES = 50
 
@@ -29,6 +55,8 @@ class PlatformCrawler(Crawler):
         page_size_key = api.get("page_size_key") or "pageSize"
         body_page_key = api.get("body_page_key")  # 分页字段在 body 时指定，否则走 query
         paginate_in_body = bool(body_page_key)
+        offset_mode = bool(api.get("offset_mode"))  # offset 式分页（值=(页-1)*页大小）
+        decrypt = api.get("decrypt")
         data_path = api.get("data_path", "data.list")
         total_path = api.get("total_path")
 
@@ -42,19 +70,25 @@ class PlatformCrawler(Crawler):
                 body = dict(base_body)
                 params = dict(base_params)
                 if page_param:
+                    val = (page - 1) * page_size if offset_mode else page
                     if paginate_in_body:
-                        body[body_page_key] = page
-                        body[page_size_key] = page_size
+                        _set_nested(body, body_page_key, val)
+                        _set_nested(body, page_size_key, page_size)
                     else:
-                        params[page_param] = page
+                        params[page_param] = val
                         params[page_size_key] = page_size
 
                 send_kwargs = {"params": params}
                 if method in ("POST", "PUT", "PATCH"):
-                    send_kwargs["json"] = body
+                    if api.get("form"):
+                        send_kwargs["data"] = body
+                    else:
+                        send_kwargs["json"] = body
                 resp = await client.request(method, url, headers=headers, **send_kwargs)
                 resp.raise_for_status()
                 data = resp.json()
+                if decrypt == "moka":
+                    data = _decrypt_moka(data)
 
                 items = dig(data, data_path) or []
                 if isinstance(items, dict):
