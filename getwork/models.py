@@ -19,6 +19,7 @@ class JobRecord:
     deadline: str | None = None
     apply_url: str = ""
     description: str | None = None
+    requirement: str | None = None
     raw: dict = field(default_factory=dict)
 
     def to_dict(self, include_raw: bool = False) -> dict:

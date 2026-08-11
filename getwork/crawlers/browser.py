@@ -50,6 +50,77 @@ def _viewport(settings: Settings) -> dict:
     return {"width": int(vp[0]), "height": int(vp[1])}
 
 
+async def _read_json(resp: Any) -> Any:
+    """读取响应体并解析 JSON，失败返回 None。"""
+    try:
+        body = await resp.body()
+    except Exception:
+        return None
+    try:
+        return json.loads(body.decode("utf-8"))
+    except Exception:
+        return None
+
+
+async def _page_fetch_json(page: Any, url: str, method: str, body_obj: dict, headers: dict) -> Any:
+    """在页面上下文里 fetch，返回解析后的 JSON；非 JSON 时包成 {"__raw__": ...}。"""
+    body_js = json.dumps(body_obj) if body_obj else "undefined"
+    js = (
+        "async () => {"
+        f"const h = {json.dumps(headers)};"
+        f"const r = await fetch({json.dumps(url)}, {{"
+        f"method: {json.dumps(method)},"
+        "headers: Object.assign({'Content-Type': 'application/json'}, h),"
+        f"body: {body_js}"
+        "});"
+        "const t = await r.text();"
+        "try { return JSON.parse(t); } catch { return { __raw__: t.slice(0, 300), __status__: r.status }; }"
+        "}"
+    )
+    return await page.evaluate(js)
+
+
+async def _replay_request(
+    page: Any,
+    req: dict,
+    page_param: str,
+    pg: int,
+    page_size: int,
+    page_size_key: str,
+    paginate_in_body: bool,
+    offset_mode: bool,
+) -> Any:
+    """按捕获到的原始请求重放下一页，替换分页参数。"""
+    from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
+
+    url = req.get("url", "")
+    method = req.get("method", "GET").upper()
+    # content-type 由 _page_fetch_json 统一设置，避免大小写重复头
+    headers = {k: v for k, v in (req.get("headers") or {}).items() if k.lower() != "content-type"}
+    val = (pg - 1) * page_size if offset_mode else pg
+
+    if method in ("POST", "PUT", "PATCH") and paginate_in_body:
+        body: dict = {}
+        pd = req.get("post_data")
+        if pd:
+            try:
+                parsed = json.loads(pd)
+                if isinstance(parsed, dict):
+                    body = parsed
+            except Exception:
+                pass
+        body[page_param] = val
+        body[page_size_key] = page_size
+        return await _page_fetch_json(page, url, method, body, headers)
+
+    u = urlparse(url)
+    q = dict(parse_qsl(u.query))
+    q[page_param] = str(val)
+    q[page_size_key] = str(page_size)
+    url2 = urlunparse(u._replace(query=urlencode(q)))
+    return await _page_fetch_json(page, url2, method, {}, headers)
+
+
 class BrowserCrawler(Crawler):
     """按 source.selectors 在渲染后的 DOM 里抓取；需要登录时抛 LoginRequiredError。"""
 
@@ -61,13 +132,30 @@ class BrowserCrawler(Crawler):
         timeout = int(self.settings.timeouts_sec.get("page_load", 45)) * 1000
         api = self.source.api
         captured: list[Any] = []
+        first_req: dict | None = None
+
+        def match_url(u: str) -> bool:
+            if not api:
+                return False
+            m = api.get("response_match") or api.get("url")
+            return bool(m and m in u)
 
         def on_response(resp: Any) -> None:
-            if not api:
+            nonlocal first_req
+            if not match_url(resp.url):
                 return
-            match = api.get("response_match") or api.get("url")
-            if match and match in resp.url:
-                captured.append(resp)
+            captured.append(resp)
+            if first_req is None:
+                req = resp.request
+                first_req = {
+                    "url": req.url,
+                    "method": req.method,
+                    "headers": {
+                        k: v for k, v in req.headers.items()
+                        if k.lower() not in ("content-length", "content-type", "cookie")
+                    },
+                    "post_data": req.post_data,
+                }
 
         async with _browser(self.settings) as browser:
             context = await browser.new_context(
@@ -77,7 +165,7 @@ class BrowserCrawler(Crawler):
             if cookies:
                 await context.add_cookies(cookies)
             page = await context.new_page()
-            # 响应捕获模式需在导航前挂监听
+            # 捕获模式需在导航前挂监听
             if api:
                 page.on("response", on_response)
 
@@ -85,13 +173,13 @@ class BrowserCrawler(Crawler):
             if await self._is_login_wall(page):
                 raise LoginRequiredError(f"{self.source.name} 跳转到了登录页")
 
-            # 配了 api 就走「捕获页面自身岗位 API 响应」；否则渲染 DOM 后按 selectors 抓
+            # 配了 api 就走「捕获页面自身岗位 API 响应 + 翻页重放」；否则渲染 DOM 后按 selectors 抓
             if api:
                 try:
                     await page.wait_for_load_state("networkidle", timeout=15000)
                 except Exception:
                     pass
-                return await self._parse_captured(captured, api)
+                return await self._parse_captured(page, captured, api, first_req)
 
             if self.source.wait_for:
                 try:
@@ -110,41 +198,117 @@ class BrowserCrawler(Crawler):
                         jobs.append(job)
         return jobs
 
-    async def _parse_captured(self, captured: list[Any], api: dict) -> list[JobRecord]:
-        """把页面自身收到的岗位 API 响应解析成岗位列表（规避签名/anti-bot）。"""
+    async def _parse_captured(
+        self, page: Any, captured: list[Any], api: dict, first_req: dict | None
+    ) -> list[JobRecord]:
+        """解析页面自身收到的岗位 API 响应；滚动/点下一页触发页面自己加载更多。"""
         data_path = api.get("data_path") or "data.list"
         total_path = api.get("total_path")
-        seen: set[str] = set()
+        seen: set[tuple] = set()
         jobs: list[JobRecord] = []
-        for resp in captured:
-            try:
-                body = await resp.body()
-            except Exception:
-                continue
-            try:
-                data = json.loads(body.decode("utf-8"))
-            except Exception:
-                continue
-            items = dig(data, data_path) or []
-            if isinstance(items, dict):
-                items = [items]
-            for it in items:
-                if not isinstance(it, dict):
-                    continue
-                job = job_from_fields(it, self.source)
-                if not job:
-                    continue
-                key = (job.title, job.location)
-                if key not in seen:
-                    seen.add(key)
-                    jobs.append(job)
-            total = dig(data, total_path) if total_path else None
-            if total is not None and len(jobs) >= int(total):
-                break
+        idx = 0
+
+        async def drain() -> int:
+            nonlocal idx
+            added = 0
+            while idx < len(captured):
+                data = await _read_json(captured[idx])
+                idx += 1
+                if data is not None:
+                    added += self._consume_items(data, data_path, total_path, seen, jobs)
+            return added
+
+        await drain()
         if not captured:
             log.warning("%s: 未捕获到匹配 response_match 的岗位 API 响应", self.source.key)
             return jobs
+
+        # 滚动触发懒加载
+        for _ in range(int(api.get("scroll_more") or 0)):
+            added = await drain()
+            if added == 0:
+                break
+            try:
+                await page.mouse.wheel(0, 8000)
+            except Exception:
+                break
+            await page.wait_for_timeout(1500)
+
+        # 点击「下一页」按钮翻页
+        sel = api.get("load_more_selector")
+        if sel:
+            for _ in range(int(api.get("load_more_rounds") or 5)):
+                btn = page.locator(sel).first
+                try:
+                    if await btn.count() == 0:
+                        break
+                    cls = (await btn.get_attribute("class")) or ""
+                    if "disabled" in cls or await btn.get_attribute("disabled") is not None:
+                        break
+                    await btn.click(timeout=5000)
+                except Exception:
+                    break
+                await page.wait_for_timeout(1500)
+                if await drain() == 0:
+                    await page.wait_for_timeout(1200)
+                    if await drain() == 0:
+                        break
+
+        # 翻页重放（配置了 page_param 才启用）
+        if api.get("page_param") and first_req:
+            try:
+                await self._paginate(page, api, first_req, seen, jobs)
+            except Exception:
+                log.exception("%s: 翻页重放失败，仅保留已捕获页", self.source.key)
         return jobs
+
+    def _consume_items(
+        self, data: Any, data_path: str, total_path: str | None,
+        seen: set[tuple], jobs: list[JobRecord],
+    ) -> int:
+        items = dig(data, data_path) or []
+        if isinstance(items, dict):
+            items = [items]
+        added = 0
+        for it in items:
+            if not isinstance(it, dict):
+                continue
+            job = job_from_fields(it, self.source)
+            if not job:
+                continue
+            key = (job.title, job.location)
+            if key not in seen:
+                seen.add(key)
+                jobs.append(job)
+                added += 1
+        return added
+
+    async def _paginate(
+        self, page: Any, api: dict, first_req: dict, seen: set[tuple], jobs: list[JobRecord]
+    ) -> None:
+        page_param = api.get("page_param")
+        page_size = int(api.get("page_size") or 20)
+        page_size_key = api.get("page_size_key") or "pageSize"
+        paginate_in_body = bool(api.get("paginate_in_body"))
+        offset_mode = bool(api.get("offset_mode"))
+        max_pages = int(api.get("max_pages") or 20)
+        data_path = api.get("data_path") or "data.list"
+        total_path = api.get("total_path")
+        pg = 2
+        while pg <= max_pages:
+            data = await _replay_request(
+                page, first_req, page_param, pg, page_size, page_size_key,
+                paginate_in_body, offset_mode,
+            )
+            if data is None or (isinstance(data, dict) and "__raw__" in data):
+                break
+            added = self._consume_items(data, data_path, total_path, seen, jobs)
+            if added == 0:
+                break
+            total = dig(data, total_path) if total_path else None
+            if total is not None and len(jobs) >= int(total):
+                break
+            pg += 1
 
     async def _is_login_wall(self, page: Any) -> bool:
         login_cfg = self.source.login or {}
