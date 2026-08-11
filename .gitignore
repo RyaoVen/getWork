@@ -1,0 +1,19 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Secrets — never commit
+.env
+
+# Runtime data (sessions, output briefings)
+data/
+
+# Logs
+*.log
