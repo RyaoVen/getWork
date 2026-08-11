@@ -52,6 +52,17 @@ sources:
       location: "workCity"
       job_type: "jobDirection"
       publish_date: "publishTime"
+    # 列表 API 不含要求，逐岗位调详情接口补全（详情接口在页面会话内可直接调）
+    detail:
+      url: "https://campus.jd.com/api/wx/position/detail/{publishId}"
+      method: POST
+      body: { id: "{publishId}" }
+      data_path: "body"
+      throttle: 0.2
+      fields:
+        description: "workContent"
+        requirement: "qualification"
+        location: "requirementVoList.workCity"
 
   # ---- 字节跳动（响应已确认：data.job_post_list） ----
   - key: bytedance
