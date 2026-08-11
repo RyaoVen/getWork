@@ -58,6 +58,7 @@ class Source:
     selectors: dict = field(default_factory=dict)
     api: dict = field(default_factory=dict)
     fields: dict = field(default_factory=dict)
+    detail: dict | None = None
     login: dict | None = None
 
     def as_meta(self) -> dict:
@@ -120,6 +121,7 @@ def _parse_source(raw: dict) -> Source:
         selectors=raw.get("selectors") or {},
         api=raw.get("api") or {},
         fields=raw.get("fields") or {},
+        detail=raw.get("detail"),
         login=raw.get("login"),
     )
 

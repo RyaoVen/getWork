@@ -22,6 +22,7 @@ from .base import (
     LoginRequiredError,
     UA,
     dig,
+    first_text,
     job_from_fields,
     resolve_url,
 )
@@ -121,6 +122,20 @@ async def _replay_request(
     return await _page_fetch_json(page, url2, method, {}, headers)
 
 
+def _fmt_template(tpl: str, raw: dict) -> str:
+    """把含 {字段} 的模板按 raw 字典填充；不含模板时原样返回。"""
+    if not isinstance(tpl, str):
+        return str(tpl)
+    if "{" not in tpl:
+        return tpl
+
+    def repl(m: re.Match) -> str:
+        v = dig(raw, m.group(1))
+        return first_text(v) or ""
+
+    return re.sub(r"\{([a-zA-Z0-9_.]+)\}", repl, tpl)
+
+
 class BrowserCrawler(Crawler):
     """按 source.selectors 在渲染后的 DOM 里抓取；需要登录时抛 LoginRequiredError。"""
 
@@ -179,7 +194,10 @@ class BrowserCrawler(Crawler):
                     await page.wait_for_load_state("networkidle", timeout=15000)
                 except Exception:
                     pass
-                return await self._parse_captured(page, captured, api, first_req)
+                jobs = await self._parse_captured(page, captured, api, first_req)
+                if self.source.detail:
+                    jobs = await self._enrich_details(page, jobs, self.source.detail)
+                return jobs
 
             if self.source.wait_for:
                 try:
@@ -309,6 +327,46 @@ class BrowserCrawler(Crawler):
             if total is not None and len(jobs) >= int(total):
                 break
             pg += 1
+
+    async def _enrich_details(self, page: Any, jobs: list[JobRecord], cfg: dict) -> list[JobRecord]:
+        """逐岗位调详情接口，补全 description/requirement/location（列表 API 不含详情时用）。"""
+        url_tpl = cfg.get("url")
+        if not url_tpl:
+            return jobs
+        method = (cfg.get("method") or "GET").upper()
+        body_tpl = cfg.get("body") or {}
+        data_path = cfg.get("data_path")
+        fields = cfg.get("fields") or {}
+        throttle = float(cfg.get("throttle") or 0.2)
+        for job in jobs:
+            raw = job.raw or {}
+            url = _fmt_template(url_tpl, raw)
+            if not url:
+                continue
+            body = {k: _fmt_template(v, raw) for k, v in body_tpl.items()} if body_tpl else {}
+            data = await _page_fetch_json(page, url, method, body, {})
+            if isinstance(data, dict) and "__raw__" in data:
+                continue
+            detail = dig(data, data_path) if data_path else data
+            if not isinstance(detail, dict):
+                detail = data
+            if not isinstance(detail, dict):
+                continue
+            if fields.get("description"):
+                v = first_text(dig(detail, fields["description"]))
+                if v:
+                    job.description = v
+            if fields.get("requirement"):
+                v = first_text(dig(detail, fields["requirement"]))
+                if v:
+                    job.requirement = v
+            if fields.get("location"):
+                v = first_text(dig(detail, fields["location"]))
+                if v:
+                    job.location = v
+            if throttle:
+                await page.wait_for_timeout(int(throttle * 1000))
+        return jobs
 
     async def _is_login_wall(self, page: Any) -> bool:
         login_cfg = self.source.login or {}
