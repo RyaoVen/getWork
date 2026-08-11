@@ -35,6 +35,15 @@ sources:
       location: "workCities"
       job_type: "recruitLabelName"
       apply_url: "positionUrl"
+    # 详情接口：jobDetails/getJobDetailsByPostId（页面会话内可直接调）
+    detail:
+      url: "https://join.qq.com/api/v1/jobDetails/getJobDetailsByPostId?postId={postId}"
+      method: GET
+      data_path: "data"
+      throttle: 0.2
+      fields:
+        description: "desc"
+        requirement: "request"
 
   # ---- 京东（响应已确认：body.items） ----
   - key: jd
@@ -99,6 +108,14 @@ sources:
       title: "name"
       location: "workLocations"
       publish_date: "modifyTime"
+    # 详情接口带 csrf（用当前 XSRF-TOKEN cookie 填充 {csrf}）
+    detail:
+      mode: page
+      url: "https://campus-talent.alibaba.com/campus/position/{id}"
+      text_markers:
+        description: ["职位描述"]
+        requirement: ["职位要求", "任职要求"]
+      throttle: 0.3
 
   # ---- 得物（响应已确认：data.job_post_list，与字节同平台） ----
   - key: dewu
@@ -133,6 +150,15 @@ sources:
       load_more_rounds: 8
     fields:
       title: "postName"
+    # 详情接口需 X-HW-ID（固定值在 URL 里）；职责/要求在各发布渠道块里
+    detail:
+      url: "https://apig.xfusion.com/api/xJob/xjobpostdeliver/postDeliverDetail?postId={postIdKey}&pubChannel=3&X-HW-ID=aa7ff6cd1d724291a2bf569e7dd29fb0"
+      method: GET
+      data_path: "data"
+      throttle: 0.2
+      fields:
+        description: "postPubChannList.jobDesc"
+        requirement: "postPubChannList.jobRequirement"
 
   # ---- 拼多多（部分：捕获到的是实习项目列表 result.list，岗位细分待补） ----
   - key: pdd
