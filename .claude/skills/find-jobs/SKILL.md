@@ -32,6 +32,15 @@ profile:
 
 ## 2. 抓取岗位
 
+### 添加目标公司（用户给了公司名 + 链接，说"添加这个公司"时）
+
+1. 调 `add_source(name=公司名, url=链接)`（strategy 会自动探测；若用户/你知道是平台 API 可带 `platform`/`company_key`）。
+2. 立即对返回的 `source.key` 调 `crawl_jobs` 验证能否抓到岗位。
+3. 若抓不到或字段为空：用 WebFetch/浏览器看页面结构，推断 `selectors`（static/dynamic）或 `api`+`fields`（platform），再调 `add_source` 传这些配置覆盖（同名 key 覆盖）。
+4. 确认可用后，把公司名写进画像的 `target_companies`，存回 `config/profile.yaml`。
+
+然后继续：
+
 1. `list_sources` 查看已配置的来源。
 2. 逐个 `crawl_jobs(source=<key>)`（可按需传 `since_days`）。
 3. 若返回 `status: "login_required"`：向用户索要该来源的**账号和密码**（说明只用于本次登录、不落盘），调用 `login(source, username, password)`，成功后重试 `crawl_jobs`。若登录返回 `captcha_required`，用 `headed: true` 重试，让用户在弹出的浏览器窗口里手动完成验证码/滑块。
@@ -46,20 +55,33 @@ profile:
 
 ## 4. 生成简报（Markdown）
 
-用 `render_briefing(markdown, title)`。Markdown 建议结构：
+用 `render_briefing(markdown, title)`。简报**固定分两部分**：
 
-- 标题 + 生成时间
-- 概览：共抓 N 家 / 匹配 M 条 / 按公司汇总
-- 按公司分节：表格列 岗位 / 地点 / 部门 / 发布日期 / 截止 / 申请链接 / 匹配理由
-- 末尾：申请链接汇总
+### (a) 顶部总表格
+一张总表，一眼看全貌：`公司 | 岗位数 | 匹配关键词 | 匹配理由概述 | 申请链接`
+
+### (b) 下方每个岗位的内容块
+每个岗位一个内容块（小标题），包含四要素：
+
+- **岗位方向**：这个岗位是做什么的（从岗位描述里提炼）
+- **要求**：学历 / 技术栈 / 经验等硬性要求
+- **发展建议**：结合你的画像和岗位要求，建议补什么、准备什么
+- **附**：地点 / 发布日期 / 截止 / 申请链接
+
+（发展方向/要求/建议由你根据岗位描述与画像生成，不是照抄招聘文案。）
 
 `render_briefing` 会返回 `html_path` 和 `png_path`（相对 data/ 的路径）。
 
 ## 5. 邮件推送
 
 - 先确认收件邮箱（画像里 `recipient_email` 或 .env 的 `SMTP_TO`，否则问用户）。
-- 若 `send_email` 返回 `not_configured`：引导用户——在 `C:\Users\25108\Desktop\文件\项目\getWork\.env` 填 `SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_AUTHCODE`（QQ/网易需先在邮箱设置里开启 SMTP 并生成授权码，不是登录密码），填好后再调 `send_email`。
+- 若 `send_email` 返回 `not_configured`：说明 SMTP 还没配置，**引导用户一次性配置**——在 `C:\Users\25108\Desktop\文件\项目\getWork\.env`（没有就复制 `.env.example`）填：
+  - `SMTP_HOST`/`SMTP_PORT`：QQ 邮箱 `smtp.qq.com` 465；网易 163 `smtp.163.com` 465
+  - `SMTP_USER`：邮箱地址
+  - `SMTP_AUTHCODE`：**授权码**（QQ：设置 → 账户 → 开启 SMTP 服务 → 生成 16 位授权码；163：设置 → POP3/SMTP → 开启后按提示生成）。授权码不是登录密码。
+  - 配好后由用户保存，你再调 `send_email` 重试。SMTP 配置是一次性的，之后每次跑都会复用。
 - 调 `send_email(to, subject, html=<render_briefing 的 html>, attachment_path=<png_path>)`：HTML 正文 + PNG 附件。
+- 若返回 `auth_failed`：授权码可能过期/填错，提示用户重新生成。
 
 ## 6. 汇报
 

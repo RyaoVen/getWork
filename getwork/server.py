@@ -10,7 +10,7 @@ from mcp.server import MCPServer
 
 from . import __version__
 from .briefing import render_briefing as _render_briefing
-from .config import DEFAULT_DATA_DIR, ConfigError, load_config
+from .config import DEFAULT_DATA_DIR, ConfigError, add_source_entry, load_config
 from .crawlers import (
     CaptchaRequiredError,
     InvalidCredentialsError,
@@ -18,6 +18,7 @@ from .crawlers import (
     get_crawler,
 )
 from .crawlers.browser import login_source
+from .detect import detect_strategy
 from .mailer import (
     MailAuthError,
     Mailer,
@@ -49,6 +50,20 @@ def _now_iso() -> str:
 def _resolve_data_path(p: str) -> Path:
     path = Path(p)
     return path if path.is_absolute() else DEFAULT_DATA_DIR / path
+
+
+def _key_from_url(url: str, company_key: str | None = None) -> str:
+    from urllib.parse import urlparse
+    import re
+
+    host = (urlparse(url).netloc or "").lower().replace("www.", "")
+    base = re.sub(r"[^a-z0-9]+", "-", host).strip("-") or "company"
+    base = base[:40]
+    if company_key:
+        ck = re.sub(r"[^a-z0-9_-]+", "-", company_key.lower()).strip("-")[:20]
+        if ck:
+            base = f"{base}-{ck}"
+    return base
 
 
 def _source_missing(source: str) -> dict:
@@ -150,6 +165,76 @@ async def logout(source: str) -> dict:
     """清除指定来源已保存的登录会话（cookie）。"""
     cleared = sessions.clear_cookies(source)
     return {"status": "ok", "source": source, "cleared": cleared}
+
+
+@server.tool()
+async def add_source(
+    name: str,
+    url: str,
+    strategy: str | None = None,
+    needs_login: bool = False,
+    platform: str | None = None,
+    company_key: str | None = None,
+    key: str | None = None,
+    selectors: dict | None = None,
+    api: dict | None = None,
+    fields: dict | None = None,
+) -> dict:
+    """添加/更新一个目标公司来源（用户说"添加这个公司"时用）。
+
+    写入 config/sources.custom.yaml，list_sources / crawl_jobs 立即生效。
+    strategy 不传时自动探测（static/dynamic/platform）。同名 key 覆盖，可用来补正配置。
+
+    Args:
+        name: 公司名
+        url: 校招官网/岗位页链接
+        strategy: static | dynamic | platform（不传则自动探测）
+        needs_login: 是否需要账号登录
+        platform: 招聘平台标识（strategy=platform 时）
+        company_key: 平台内的公司标识（strategy=platform 时）
+        key: 来源 key（默认由域名生成）
+        selectors/api/fields: static/dynamic/platform 的抓取配置（探测不精确时用来覆盖）
+    """
+    from urllib.parse import urlparse
+
+    if not name or not name.strip():
+        return {"status": "error", "reason": "bad_name", "message": "name 不能为空"}
+    u = urlparse(url)
+    if u.scheme not in ("http", "https") or not u.netloc:
+        return {"status": "error", "reason": "bad_url", "message": "url 需为 http(s) 链接"}
+
+    chosen = strategy
+    note = []
+    if not chosen:
+        det = await detect_strategy(url)
+        chosen = det.get("strategy", "static")
+        note.append(f"strategy 自动探测为 {chosen}（{det.get('reason')}）")
+
+    entry = {
+        "key": key or _key_from_url(url, company_key),
+        "name": name.strip(),
+        "url": url,
+        "strategy": chosen,
+        "needs_login": needs_login,
+    }
+    if platform:
+        entry["platform"] = platform
+    if company_key:
+        entry["company_key"] = company_key
+    if selectors:
+        entry["selectors"] = selectors
+    if api:
+        entry["api"] = api
+    if fields:
+        entry["fields"] = fields
+
+    try:
+        src = add_source_entry(entry)
+    except Exception as e:
+        log.exception("add_source failed")
+        return {"status": "error", "reason": "write_failed", "message": str(e)}
+    note.append("已写入 config/sources.custom.yaml，建议立即 crawl_jobs 验证；选择器不准时用 add_source 传 selectors/api 覆盖")
+    return {"status": "ok", "source": src.as_meta(), "note": "；".join(note)}
 
 
 @server.tool()
