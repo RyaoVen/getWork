@@ -75,7 +75,7 @@ profile:
 ## 5. 邮件推送
 
 - 先确认收件邮箱（画像里 `recipient_email` 或 .env 的 `SMTP_TO`，否则问用户）。
-- 若 `send_email` 返回 `not_configured`：说明 SMTP 还没配置，**引导用户一次性配置**——在 `C:\Users\25108\Desktop\文件\项目\getWork\.env`（没有就复制 `.env.example`）填：
+- 若 `send_email` 返回 `not_configured`：说明 SMTP 还没配置，**引导用户一次性配置**——在项目根目录的 `.env`（没有就复制 `.env.example`）填：
   - `SMTP_HOST`/`SMTP_PORT`：QQ 邮箱 `smtp.qq.com` 465；网易 163 `smtp.163.com` 465
   - `SMTP_USER`：邮箱地址
   - `SMTP_AUTHCODE`：**授权码**（QQ：设置 → 账户 → 开启 SMTP 服务 → 生成 16 位授权码；163：设置 → POP3/SMTP → 开启后按提示生成）。授权码不是登录密码。
