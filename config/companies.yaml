@@ -230,6 +230,21 @@ sources:
     fields:
       title: "name"
 
+  # ---- 网易（queryPage 响应已确认，含要求/描述） ----
+  - key: netease
+    name: "网易校招"
+    url: "https://hr.163.com/job-list.html?workType=1"
+    strategy: dynamic
+    api:
+      response_match: "queryPage"
+      data_path: "data.list"
+    fields:
+      title: "name"
+      job_type: "firstPostTypeName"
+      description: "description"
+      requirement: "requirement"
+      department: "firstDepName"
+
   # ---- 以下站点岗位 API 结构尚未完全逆向，先注册，待补充 response_match/fields ----
   - key: meituan
     name: "美团校招"
