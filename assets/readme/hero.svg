@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 460" width="100%" role="img" aria-label="getWork：让 Claude 自动抓取 16+ 家校招站，按简历匹配岗位，把匹配版简报发进你的邮箱">
+  <title>getWork：让 Claude 自动抓取 16+ 家校招站，按简历匹配岗位，把匹配版简报发进你的邮箱</title>
+  <rect width="1200" height="460" fill="#0d1117"/>
+  <rect x="60" y="60" width="8" height="120" rx="4" fill="#3fb950"/>
+
+  <text x="96" y="108" font-family="-apple-system,Segoe UI,Microsoft YaHei,sans-serif" font-size="22" letter-spacing="2" fill="#3fb950">MCP SERVER · 校招岗位雷达</text>
+  <text x="92" y="196" font-family="-apple-system,Segoe UI,Microsoft YaHei,sans-serif" font-size="72" font-weight="700" fill="#e6edf3">getWork</text>
+  <text x="96" y="262" font-family="-apple-system,Segoe UI,Microsoft YaHei,sans-serif" font-size="24" fill="#8b949e">让 Claude 自动抓取 16+ 家校招站，</text>
+  <text x="96" y="300" font-family="-apple-system,Segoe UI,Microsoft YaHei,sans-serif" font-size="24" fill="#8b949e">按简历匹配岗位，把简报发进你的邮箱。</text>
+
+  <!-- 雷达扫描 -->
+  <g transform="translate(800,235)">
+    <circle r="150" fill="none" stroke="#21262d" stroke-width="2"/>
+    <circle r="100" fill="none" stroke="#21262d" stroke-width="2"/>
+    <circle r="50" fill="none" stroke="#21262d" stroke-width="2"/>
+    <path d="M0 0 L145 0 A145 145 0 0 0 104 -104 Z" fill="#3fb950" opacity="0.14"/>
+    <circle cx="0" cy="0" r="5" fill="#3fb950"/>
+    <line x1="0" y1="0" x2="102" y2="-102" stroke="#3fb950" stroke-width="2" opacity="0.6"/>
+
+    <circle cx="78" cy="-88" r="6" fill="#1f6feb"/>
+    <text x="94" y="-84" font-family="SFMono-Regular,Consolas,monospace" font-size="17" fill="#8b949e">腾讯</text>
+    <circle cx="-112" cy="-38" r="6" fill="#1f6feb"/>
+    <text x="-126" y="-34" font-family="SFMono-Regular,Consolas,monospace" font-size="17" fill="#8b949e">字节</text>
+    <circle cx="-52" cy="104" r="6" fill="#1f6feb"/>
+    <text x="-66" y="108" font-family="SFMono-Regular,Consolas,monospace" font-size="17" fill="#8b949e">美团</text>
+    <circle cx="118" cy="52" r="6" fill="#1f6feb"/>
+    <text x="132" y="56" font-family="SFMono-Regular,Consolas,monospace" font-size="17" fill="#8b949e">携程</text>
+    <circle cx="30" cy="118" r="6" fill="#1f6feb"/>
+    <text x="44" y="122" font-family="SFMono-Regular,Consolas,monospace" font-size="17" fill="#8b949e">百度</text>
+    <circle cx="-90" cy="-78" r="6" fill="#1f6feb"/>
+    <text x="-104" y="-74" font-family="SFMono-Regular,Consolas,monospace" font-size="17" fill="#8b949e">阿里</text>
+  </g>
+
+  <!-- 底部终端 -->
+  <rect x="60" y="380" width="1080" height="46" rx="8" fill="#161b22"/>
+  <text x="84" y="409" font-family="SFMono-Regular,Consolas,monospace" font-size="20" fill="#3fb950">$</text>
+  <text x="104" y="409" font-family="SFMono-Regular,Consolas,monospace" font-size="20" fill="#e6edf3">getwork run → 16 家 · 1982 条岗位 → 匹配 181 条 → 已发到邮箱</text>
+</svg>
