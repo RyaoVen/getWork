@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import logging
 import re
 import time
 from contextlib import asynccontextmanager
@@ -19,8 +21,12 @@ from .base import (
     InvalidCredentialsError,
     LoginRequiredError,
     UA,
+    dig,
+    job_from_fields,
     resolve_url,
 )
+
+log = logging.getLogger("getwork.browser")
 
 
 @asynccontextmanager
@@ -53,6 +59,16 @@ class BrowserCrawler(Crawler):
 
         jobs: list[JobRecord] = []
         timeout = int(self.settings.timeouts_sec.get("page_load", 45)) * 1000
+        api = self.source.api
+        captured: list[Any] = []
+
+        def on_response(resp: Any) -> None:
+            if not api:
+                return
+            match = api.get("response_match") or api.get("url")
+            if match and match in resp.url:
+                captured.append(resp)
+
         async with _browser(self.settings) as browser:
             context = await browser.new_context(
                 viewport=_viewport(self.settings), user_agent=UA
@@ -61,9 +77,21 @@ class BrowserCrawler(Crawler):
             if cookies:
                 await context.add_cookies(cookies)
             page = await context.new_page()
+            # 响应捕获模式需在导航前挂监听
+            if api:
+                page.on("response", on_response)
+
             await page.goto(self.source.url, wait_until="domcontentloaded", timeout=timeout)
             if await self._is_login_wall(page):
                 raise LoginRequiredError(f"{self.source.name} 跳转到了登录页")
+
+            # 配了 api 就走「捕获页面自身岗位 API 响应」；否则渲染 DOM 后按 selectors 抓
+            if api:
+                try:
+                    await page.wait_for_load_state("networkidle", timeout=15000)
+                except Exception:
+                    pass
+                return await self._parse_captured(captured, api)
 
             if self.source.wait_for:
                 try:
@@ -80,6 +108,42 @@ class BrowserCrawler(Crawler):
                     job = await self._extract_item(el)
                     if job:
                         jobs.append(job)
+        return jobs
+
+    async def _parse_captured(self, captured: list[Any], api: dict) -> list[JobRecord]:
+        """把页面自身收到的岗位 API 响应解析成岗位列表（规避签名/anti-bot）。"""
+        data_path = api.get("data_path") or "data.list"
+        total_path = api.get("total_path")
+        seen: set[str] = set()
+        jobs: list[JobRecord] = []
+        for resp in captured:
+            try:
+                body = await resp.body()
+            except Exception:
+                continue
+            try:
+                data = json.loads(body.decode("utf-8"))
+            except Exception:
+                continue
+            items = dig(data, data_path) or []
+            if isinstance(items, dict):
+                items = [items]
+            for it in items:
+                if not isinstance(it, dict):
+                    continue
+                job = job_from_fields(it, self.source)
+                if not job:
+                    continue
+                key = (job.title, job.location)
+                if key not in seen:
+                    seen.add(key)
+                    jobs.append(job)
+            total = dig(data, total_path) if total_path else None
+            if total is not None and len(jobs) >= int(total):
+                break
+        if not captured:
+            log.warning("%s: 未捕获到匹配 response_match 的岗位 API 响应", self.source.key)
+            return jobs
         return jobs
 
     async def _is_login_wall(self, page: Any) -> bool:
