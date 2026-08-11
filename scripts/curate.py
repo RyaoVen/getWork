@@ -16,8 +16,15 @@ from mcp.client.stdio import StdioServerParameters, stdio_client
 
 from getwork.match import filter_and_score, score_label
 from getwork.models import JobRecord
-SOURCES = ["tencent", "jd", "bytedance", "alibaba", "dewu", "xfusion"]
-NAME = {"tencent": "腾讯", "jd": "京东", "bytedance": "字节跳动", "alibaba": "阿里巴巴", "dewu": "得物", "xfusion": "超聚变"}
+SOURCES = ["tencent", "jd", "bytedance", "alibaba", "dewu", "xfusion",
+           "beike", "tencentmusic", "xiaohongshu", "kuaishou", "netease",
+           "meituan", "didi", "vipshop", "ctrip", "baidu"]
+NAME = {
+    "tencent": "腾讯", "jd": "京东", "bytedance": "字节跳动", "alibaba": "阿里巴巴",
+    "dewu": "得物", "xfusion": "超聚变", "beike": "贝壳", "tencentmusic": "腾讯音乐",
+    "xiaohongshu": "小红书", "kuaishou": "快手", "netease": "网易",
+    "meituan": "美团", "didi": "滴滴", "vipshop": "唯品会", "ctrip": "携程", "baidu": "百度",
+}
 
 
 def load_profile() -> dict:
