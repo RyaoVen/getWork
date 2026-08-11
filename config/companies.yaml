@@ -176,7 +176,61 @@ sources:
       publish_date: "releaseTime"
       description: "jobDuty"
 
-  # ---- 以下三家岗位 API 结构尚未完全逆向，先注册，待补充 response_match/fields ----
+  # ---- 贝壳（GetJobAdPageList 响应已确认） ----
+  - key: beike
+    name: "贝壳校招"
+    url: "https://campus.ke.com/intern/jobs"
+    strategy: dynamic
+    api:
+      response_match: "GetJobAdPageList"
+      data_path: "Data"
+    fields:
+      title: "JobAdName"
+      job_type: "Category"
+      apply_url: "https://campus.ke.com/intern/jobs"
+
+  # ---- 腾讯音乐（uc-job/list 响应已确认） ----
+  - key: tencentmusic
+    name: "腾讯音乐校招"
+    url: "https://join.tencentmusic.com/campus/post?type=30"
+    strategy: dynamic
+    api:
+      response_match: "uc-job/list"
+      data_path: "data.items"
+    fields:
+      title: "name"
+      description: "duty"
+      job_type: "jobf_descr"
+      location: "work_city"
+
+  # ---- 小红书（pageQueryPosition 响应已确认，含要求） ----
+  - key: xiaohongshu
+    name: "小红书校招"
+    url: "http://job.xiaohongshu.com/campus/position?campusRecruitTypes=term_intern"
+    strategy: dynamic
+    api:
+      response_match: "pageQueryPosition"
+      data_path: "data.list"
+    fields:
+      title: "positionName"
+      location: "workplace"
+      job_type: "jobType"
+      publish_date: "publishTime"
+      description: "duty"
+      requirement: "qualification"
+
+  # ---- 快手（positions/simple 响应已确认） ----
+  - key: kuaishou
+    name: "快手校招"
+    url: "https://zhaopin.kuaishou.cn/recruit/e/#/official/trainee/?workLocationCode=domestic"
+    strategy: dynamic
+    api:
+      response_match: "positions/simple"
+      data_path: "result.list"
+    fields:
+      title: "name"
+
+  # ---- 以下站点岗位 API 结构尚未完全逆向，先注册，待补充 response_match/fields ----
   - key: meituan
     name: "美团校招"
     url: "https://zhaopin.meituan.com/web/campus"
