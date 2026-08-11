@@ -64,6 +64,8 @@ sources:
       job_type: "recruit_type"
       publish_date: "publish_time"
       description: "description"
+      requirement: "requirement"
+      apply_url: "https://jobs.bytedance.com/campus/position/detail/{id}"
 
   # ---- 阿里巴巴（响应已确认：content.datas） ----
   - key: alibaba
@@ -94,6 +96,8 @@ sources:
       job_type: "recruit_type"
       publish_date: "publish_time"
       description: "description"
+      requirement: "requirement"
+      apply_url: "https://campus.dewu.com/578078/position/detail/{id}"
 
   # ---- 超聚变（响应已确认：data.result） ----
   - key: xfusion
