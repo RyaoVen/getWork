@@ -15,6 +15,10 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CONFIG = PROJECT_ROOT / "config" / "companies.yaml"
 DEFAULT_DATA_DIR = PROJECT_ROOT / "data"
 
+# 运行时由 add_source 工具追加/覆盖的来源，与手写的 companies.yaml 分开，
+# 避免机器改写破坏手写注释。
+CUSTOM_SOURCES_NAME = "sources.custom.yaml"
+
 load_dotenv(PROJECT_ROOT / ".env")
 
 VALID_STRATEGIES = ("platform", "static", "dynamic")
@@ -132,8 +136,46 @@ def load_config(path: str | Path | None = None) -> Config:
         raise ConfigError(f"解析 {config_path} 失败: {e}") from e
 
     settings = _parse_settings(raw)
-    sources = [_parse_source(s) for s in raw.get("sources") or []]
+    sources = _load_sources(raw, config_path.parent / CUSTOM_SOURCES_NAME)
     return Config(settings, sources, config_path)
+
+
+def _load_sources(raw: dict, custom_path: Path) -> list[Source]:
+    """companies.yaml 的来源 + 自定义来源（同名 key 覆盖）。"""
+    srcs = [_parse_source(s) for s in raw.get("sources") or []]
+    if custom_path.exists():
+        try:
+            custom = yaml.safe_load(custom_path.read_text(encoding="utf-8")) or []
+        except yaml.YAMLError:
+            return srcs
+        if isinstance(custom, list):
+            custom_keys = {
+                c.get("key") for c in custom if isinstance(c, dict) and c.get("key")
+            }
+            srcs = [s for s in srcs if s.key not in custom_keys]
+            srcs += [_parse_source(c) for c in custom if isinstance(c, dict)]
+    return srcs
+
+
+def add_source_entry(entry: dict) -> Source:
+    """追加/覆盖一个来源到自定义文件（sources.custom.yaml），返回解析后的 Source。"""
+    src = _parse_source(entry)
+    custom_path = (_CONFIG_PATH_OVERRIDE or DEFAULT_CONFIG).parent / CUSTOM_SOURCES_NAME
+    data: list[dict] = []
+    if custom_path.exists():
+        try:
+            loaded = yaml.safe_load(custom_path.read_text(encoding="utf-8")) or []
+        except yaml.YAMLError:
+            loaded = []
+        if isinstance(loaded, list):
+            data = [d for d in loaded if isinstance(d, dict)]
+    data = [d for d in data if d.get("key") != src.key]
+    data.append(entry)
+    custom_path.parent.mkdir(parents=True, exist_ok=True)
+    custom_path.write_text(
+        yaml.safe_dump(data, allow_unicode=True, sort_keys=False), encoding="utf-8"
+    )
+    return src
 
 
 def resolve_output_dir(settings: Settings, data_dir: Path | None = None) -> Path:

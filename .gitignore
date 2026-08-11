@@ -15,5 +15,8 @@ wheels/
 # Runtime data (sessions, output briefings)
 data/
 
+# 运行时由 add_source 工具生成的目标公司来源（与手写的 companies.yaml 分开）
+config/sources.custom.yaml
+
 # Logs
 *.log
