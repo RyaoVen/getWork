@@ -136,6 +136,28 @@ def _fmt_template(tpl: str, raw: dict) -> str:
     return re.sub(r"\{([a-zA-Z0-9_.]+)\}", repl, tpl)
 
 
+def _extract_section(text: str, markers: list[str]) -> str | None:
+    """在整页文本里按首个标记截取一段（到下一个标记或常见边界为止）。"""
+    if not markers:
+        return None
+    for m in markers:
+        i = text.find(m)
+        if i < 0:
+            continue
+        start = i + len(m)
+        end = len(text)
+        bounds = markers + ["职位描述", "职位要求", "任职要求", "岗位要求", "立即投递",
+                           "投递", "工作地点", "发布时间", "加入我们", "岗位信息", "一键投递"]
+        for b in bounds:
+            j = text.find(b, start)
+            if j >= 0:
+                end = min(end, j)
+        seg = " ".join(text[start:end].split())
+        if seg:
+            return seg[:800]
+    return None
+
+
 class BrowserCrawler(Crawler):
     """按 source.selectors 在渲染后的 DOM 里抓取；需要登录时抛 LoginRequiredError。"""
 
@@ -329,6 +351,47 @@ class BrowserCrawler(Crawler):
             pg += 1
 
     async def _enrich_details(self, page: Any, jobs: list[JobRecord], cfg: dict) -> list[JobRecord]:
+        """逐岗位补全详情。mode=page 走详情页 DOM 抓取；否则走详情 API（可在页面会话内直调）。"""
+        if cfg.get("mode") == "page":
+            return await self._enrich_details_page(page, jobs, cfg)
+        return await self._enrich_details_api(page, jobs, cfg)
+
+    async def _enrich_details_page(self, page: Any, jobs: list[JobRecord], cfg: dict) -> list[JobRecord]:
+        """导航到每个岗位详情页，从渲染后的文本里按标记截取描述/要求。"""
+        url_tpl = cfg.get("url")
+        if not url_tpl:
+            return jobs
+        markers = cfg.get("text_markers") or {}
+        desc_marks = markers.get("description") or []
+        req_marks = markers.get("requirement") or []
+        wait_sel = cfg.get("wait_selector")
+        throttle = float(cfg.get("throttle") or 0.3)
+        for job in jobs:
+            url = _fmt_template(url_tpl, job.raw or {})
+            if not url:
+                continue
+            try:
+                await page.goto(url, wait_until="domcontentloaded", timeout=25000)
+                if wait_sel:
+                    try:
+                        await page.wait_for_selector(wait_sel, timeout=8000)
+                    except Exception:
+                        pass
+                await page.wait_for_timeout(1200)
+                text = await page.evaluate("() => document.body ? document.body.innerText : ''")
+                desc = _extract_section(text, desc_marks)
+                req = _extract_section(text, req_marks)
+                if desc:
+                    job.description = desc
+                if req:
+                    job.requirement = req
+            except Exception:
+                log.warning("详情页抓取失败: %s", url)
+            if throttle:
+                await page.wait_for_timeout(int(throttle * 1000))
+        return jobs
+
+    async def _enrich_details_api(self, page: Any, jobs: list[JobRecord], cfg: dict) -> list[JobRecord]:
         """逐岗位调详情接口，补全 description/requirement/location（列表 API 不含详情时用）。"""
         url_tpl = cfg.get("url")
         if not url_tpl:
@@ -338,12 +401,31 @@ class BrowserCrawler(Crawler):
         data_path = cfg.get("data_path")
         fields = cfg.get("fields") or {}
         throttle = float(cfg.get("throttle") or 0.2)
+        csrf_cookie = cfg.get("csrf_cookie")
+
+        async def get_csrf() -> str:
+            if not csrf_cookie:
+                return ""
+            try:
+                for c in await page.context.cookies(self.source.url):
+                    if c["name"] == csrf_cookie:
+                        return c["value"]
+            except Exception:
+                pass
+            return ""
+
+        def subst(tpl: str, raw: dict, csrf_val: str) -> str:
+            if csrf_val and "{csrf}" in tpl:
+                tpl = tpl.replace("{csrf}", csrf_val)
+            return _fmt_template(tpl, raw)
+
         for job in jobs:
+            csrf_val = await get_csrf()
             raw = job.raw or {}
-            url = _fmt_template(url_tpl, raw)
+            url = subst(url_tpl, raw, csrf_val)
             if not url:
                 continue
-            body = {k: _fmt_template(v, raw) for k, v in body_tpl.items()} if body_tpl else {}
+            body = {k: subst(v, raw, csrf_val) for k, v in body_tpl.items()} if body_tpl else {}
             data = await _page_fetch_json(page, url, method, body, {})
             if isinstance(data, dict) and "__raw__" in data:
                 continue
