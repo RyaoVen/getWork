@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><title>岗位列表</title></head>
+<body>
+  <h1>测试公司 岗位（需登录）</h1>
+  <div id="login-wall" style="display:none;color:red">请先登录</div>
+  <div id="jobs" style="display:none"></div>
+  <script>
+    if (document.cookie.indexOf('session=ok') >= 0) {
+      var jobs = document.getElementById('jobs');
+      jobs.style.display = 'block';
+      [
+        { t: '后端开发实习生', l: '北京', d: '2026-08-02' },
+        { t: '算法实习生', l: '深圳', d: '2026-08-07' }
+      ].forEach(function (j) {
+        var card = document.createElement('div');
+        card.className = 'job-card';
+        card.innerHTML =
+          '<a class="job-title" href="/job/' + j.t + '">' + j.t + '</a>' +
+          '<span class="job-loc">' + j.l + '</span>' +
+          '<span class="job-date">' + j.d + '</span>';
+        jobs.appendChild(card);
+      });
+    } else {
+      document.getElementById('login-wall').style.display = 'block';
+    }
+  </script>
+</body>
+</html>

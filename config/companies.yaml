@@ -1,0 +1,78 @@
+# 校招/实习岗位来源配置。三种 strategy：
+#   platform —— 公司校招走统一招聘平台（北森/Moka/大易/大街等），后端是 JSON API，
+#               用 api.* 描述请求与字段提取路径。具体端点可在浏览器开发者工具的 Network 里抓到。
+#   static   —— 普通 HTML 页面，用 CSS 选择器抓取列表。
+#   dynamic  —— JS 重页面（SPA），用 Playwright 驱动浏览器；需要登录时配 login.*。
+#
+# 新增公司：加一个 source 条目即可，选择器/端点全部配置化，不用改代码。
+
+settings:
+  output_dir: "data/output"
+  timeouts_sec:
+    request: 20
+    page_load: 45
+    login: 60
+  browser:
+    headless: true
+    viewport: [1280, 900]
+
+sources:
+  # ---- 示例：platform 策略（占位，替换成真实公司后可用） ----
+  - key: platform-demo
+    name: "示例公司-校招(平台API)"
+    url: "https://example.com/campus"
+    strategy: platform
+    api:
+      url: "https://example.com/api/jobs"      # JSON 接口（Network 里抓）
+      method: POST
+      headers:
+        content-type: application/json
+      body: {}                                  # 静态请求体
+      page_param: "pageNo"                      # 分页参数名（query 或 body 字段）
+      page_size: 20
+      data_path: "data.jobList"                 # 列表的 JSON 路径（点分）
+      total_path: "data.total"                  # 总数（可选，用于翻页）
+    fields:
+      title: "jobName"
+      location: "workCity"
+      job_type: "jobType"
+      publish_date: "publishDate"
+      deadline: "deadline"
+      apply_url: "jobLink"
+      department: "department"
+      description: "jobDescription"
+
+  # ---- 示例：static 策略（占位） ----
+  - key: static-demo
+    name: "示例公司-校招(静态页)"
+    url: "https://example.com/jobs"
+    strategy: static
+    selectors:
+      list: "ul.job-list li"
+      title: "h3 a"
+      link: "h3 a@href"
+      location: ".loc"
+      publish_date: ".date"
+      pagination: ".pager a.next"
+      page_param: "page"
+
+  # ---- 示例：dynamic 策略，需登录（占位） ----
+  - key: login-demo
+    name: "示例公司-校招(需登录)"
+    url: "https://example.com/campus/jobs"
+    strategy: dynamic
+    needs_login: true
+    wait_for: ".job-card"
+    selectors:
+      list: ".job-card"
+      title: ".job-title"
+      link: "a.job-link@href"
+      location: ".job-loc"
+      publish_date: ".job-date"
+    login:
+      url: "https://example.com/login"
+      username_selector: "#account"
+      password_selector: "#password"
+      submit_selector: "button.login-btn"
+      success_check: { type: url_contains, value: "/campus" }
+      error_selector: ".login-error"

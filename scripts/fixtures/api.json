@@ -1,0 +1,26 @@
+{
+  "code": 0,
+  "data": {
+    "total": 2,
+    "jobList": [
+      {
+        "jobName": "后端开发实习生",
+        "workCity": "北京",
+        "department": "技术研发部",
+        "jobType": "日常实习",
+        "publishDate": "2026-08-01",
+        "jobLink": "https://job.example/detail/1",
+        "jobDescription": "负责核心服务开发，Python/Go。"
+      },
+      {
+        "jobName": "前端开发实习生",
+        "workCity": "上海",
+        "department": "技术研发部",
+        "jobType": "日常实习",
+        "publishDate": "2026-08-09",
+        "jobLink": "https://job.example/detail/2",
+        "jobDescription": "负责 Web 前端开发，React。"
+      }
+    ]
+  }
+}

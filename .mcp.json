@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "getwork": {
+      "type": "stdio",
+      "command": "uv",
+      "args": [
+        "--directory",
+        "C:\\Users\\25108\\Desktop\\文件\\项目\\getWork",
+        "run",
+        "python",
+        "-m",
+        "getwork"
+      ]
+    }
+  }
+}

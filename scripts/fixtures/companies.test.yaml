@@ -1,0 +1,60 @@
+settings:
+  output_dir: "data/output"
+  timeouts_sec: { request: 10, page_load: 20, login: 20 }
+  browser: { headless: true, viewport: [1280, 900] }
+
+sources:
+  - key: local-static
+    name: "本地测试公司(静态)"
+    url: "http://127.0.0.1:8123/jobs.html"
+    strategy: static
+    selectors:
+      list: "ul.job-list li"
+      title: "h3 a"
+      link: "h3 a@href"
+      location: ".loc"
+      publish_date: ".date"
+      department: ".dept"
+      pagination: ".pager a.next"
+
+  - key: local-platform
+    name: "本地测试公司(平台API)"
+    url: "http://127.0.0.1:8123/api.json"
+    strategy: platform
+    api:
+      url: "http://127.0.0.1:8123/api.json"
+      method: GET
+      data_path: "data.jobList"
+      total_path: "data.total"
+      page_param: "pageNo"
+      page_size: 20
+    fields:
+      title: "jobName"
+      location: "workCity"
+      department: "department"
+      job_type: "jobType"
+      publish_date: "publishDate"
+      apply_url: "jobLink"
+      description: "jobDescription"
+
+  - key: local-login
+    name: "本地测试公司(需登录)"
+    url: "http://127.0.0.1:8123/secure/jobs.html"
+    strategy: dynamic
+    needs_login: true
+    wait_for: "#jobs"
+    selectors:
+      list: ".job-card"
+      title: ".job-title"
+      link: ".job-title@href"
+      location: ".job-loc"
+      publish_date: ".job-date"
+    login:
+      url: "http://127.0.0.1:8123/secure/login.html"
+      username_selector: "#username"
+      password_selector: "#password"
+      submit_selector: "#login-btn"
+      success_check: { type: selector, value: "#jobs" }
+      error_selector: "#login-error"
+      wall_url_contains: "login"
+      wall_selector: "#login-wall"
