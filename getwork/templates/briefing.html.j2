@@ -5,39 +5,96 @@
 <title>{{ title }}</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { background: #f6f4ef; }
   body {
-    font-family: -apple-system, "Segoe UI", "Microsoft YaHei", "PingFang SC", "Helvetica Neue", Arial, sans-serif;
-    background: #ffffff;
-    color: #1f2329;
-    line-height: 1.6;
-    padding: 32px 40px 48px;
-    max-width: 800px;
-    margin: 0 auto;
+    font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: #23201c;
+    line-height: 1.65;
     font-size: 14px;
+    -webkit-font-smoothing: antialiased;
   }
-  h1 { font-size: 24px; font-weight: 700; color: #111; margin-bottom: 4px; }
-  .meta { color: #8a919f; font-size: 12px; margin-bottom: 24px; }
-  h2 { font-size: 18px; font-weight: 600; margin: 28px 0 12px; padding-bottom: 6px; border-bottom: 2px solid #eef0f4; color: #24292f; }
-  h3 { font-size: 15px; font-weight: 600; margin: 18px 0 8px; color: #24292f; }
-  p { margin: 8px 0; }
+  .sheet {
+    max-width: 760px;
+    margin: 0 auto;
+    background: #fffdfa;
+    padding: 48px 56px 64px;
+    box-shadow: 0 0 0 1px #eae5dc;
+  }
+
+  /* 头部 */
+  .masthead { border-bottom: 1px solid #e3ddd2; padding-bottom: 22px; margin-bottom: 34px; }
+  .masthead .date {
+    font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
+    color: #9a8f7c; margin-bottom: 10px;
+  }
+  .masthead h1 {
+    font-family: Georgia, "Songti SC", "Noto Serif SC", SimSun, serif;
+    font-size: 27px; font-weight: 500; color: #1c1915; letter-spacing: .01em;
+  }
+  .masthead .sub { margin-top: 8px; font-size: 13px; color: #7a7261; }
+
+  /* 正文标题层级 */
+  h2 {
+    font-family: Georgia, "Songti SC", "Noto Serif SC", SimSun, serif;
+    font-size: 19px; font-weight: 600; color: #2c4a40;
+    margin: 40px 0 14px; padding-top: 18px; border-top: 1px solid #e8e2d6;
+  }
+  h2:first-of-type { border-top: none; padding-top: 0; margin-top: 4px; }
+  h3 {
+    font-size: 16px; font-weight: 600; color: #1c1915;
+    margin: 26px 0 6px; line-height: 1.4;
+  }
+  p { margin: 8px 0; color: #3a352d; }
+  strong { color: #1c1915; font-weight: 600; }
+
+  /* 总表 */
+  table { border-collapse: collapse; width: 100%; margin: 14px 0 22px; font-size: 13px; }
+  th {
+    text-align: left; font-weight: 600; color: #2c4a40;
+    border-bottom: 2px solid #2c4a40; padding: 8px 10px; white-space: nowrap;
+    font-size: 12.5px; letter-spacing: .02em;
+  }
+  td { padding: 9px 10px; border-bottom: 1px solid #ece6da; vertical-align: top; }
+  tr:nth-child(even) td { background: #faf7f1; }
+
+  /* 岗位内容块 */
+  blockquote {
+    margin: 14px 0 22px; padding: 16px 20px;
+    background: #f8f5ee; border-left: 3px solid #c8bfa8;
+    color: #3a352d;
+  }
+  blockquote p { margin: 4px 0; }
+  blockquote a { color: #2c4a40; }
+
   ul, ol { padding-left: 22px; margin: 8px 0; }
   li { margin: 4px 0; }
-  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 13px; }
-  th, td { border: 1px solid #e2e5ea; padding: 8px 10px; text-align: left; vertical-align: top; }
-  th { background: #f6f8fa; font-weight: 600; white-space: nowrap; }
-  tr:nth-child(even) td { background: #fafbfc; }
-  a { color: #0969da; text-decoration: none; }
-  a:hover { text-decoration: underline; }
-  code { background: #f6f8fa; padding: 1px 5px; border-radius: 4px; font-family: "SFMono-Regular", Consolas, monospace; font-size: 12px; }
-  pre { background: #f6f8fa; padding: 12px 14px; border-radius: 6px; overflow-x: auto; margin: 10px 0; }
+
+  /* 链接：给详情链接一个安静的存在感 */
+  a {
+    color: #2c5f52; text-decoration: none;
+    border-bottom: 1px solid rgba(44, 95, 82, .35);
+  }
+  a:hover { color: #1f4639; border-bottom-color: #1f4639; }
+
+  code { font-family: "SFMono-Regular", Consolas, "Courier New", monospace; font-size: 12.5px; background: #f1ece2; padding: 1px 5px; border-radius: 3px; }
+  pre { background: #f1ece2; padding: 12px 14px; border-radius: 4px; overflow-x: auto; margin: 10px 0; }
   pre code { background: none; padding: 0; }
-  blockquote { border-left: 3px solid #d0d7de; padding-left: 12px; color: #57606a; margin: 10px 0; }
-  .tag { display: inline-block; background: #ddf4ff; color: #0969da; border-radius: 4px; padding: 0 6px; font-size: 12px; margin-right: 6px; }
+
+  hr { border: none; border-top: 1px solid #e3ddd2; margin: 28px 0; }
+
+  /* 页脚 */
+  .foot { margin-top: 48px; padding-top: 16px; border-top: 1px solid #e3ddd2; font-size: 12px; color: #9a8f7c; }
 </style>
 </head>
 <body>
-  <h1>{{ title }}</h1>
-  <div class="meta">生成时间：{{ generated_at }}</div>
-  {{ body | safe }}
+  <div class="sheet">
+    <div class="masthead">
+      <div class="date">{{ generated_at }}</div>
+      <h1>{{ title }}</h1>
+      {% if sub %}<div class="sub">{{ sub }}</div>{% endif %}
+    </div>
+    {{ body | safe }}
+    <div class="foot">由 getWork 自动整理 · 岗位信息以官网为准，申请请以官网发布为准</div>
+  </div>
 </body>
 </html>
