@@ -1,10 +1,12 @@
 # 校招/实习岗位来源配置。三种 strategy：
-#   platform —— 公司校招走统一招聘平台（北森/Moka/大易/大街等），后端是 JSON API，
-#               用 api.* 描述请求与字段提取路径。具体端点可在浏览器开发者工具的 Network 里抓到。
+#   platform —— 公司校招走统一招聘平台，后端是 JSON API，直接请求（api.*）。
 #   static   —— 普通 HTML 页面，用 CSS 选择器抓取列表。
-#   dynamic  —— JS 重页面（SPA），用 Playwright 驱动浏览器；需要登录时配 login.*。
+#   dynamic  —— JS 重页面（SPA），用 Playwright 驱动；配 api.* 时监听页面自己发出的
+#               岗位 API 响应（response_match 匹配 URL 片段）并解析 JSON，规避签名/anti-bot。
+# 需要登录的来源配 needs_login + login.*，由 Agent 用 login 工具处理。
 #
 # 新增公司：加一个 source 条目即可，选择器/端点全部配置化，不用改代码。
+# 运行时通过 add_source 工具追加的公司写进 config/sources.custom.yaml。
 
 settings:
   output_dir: "data/output"
@@ -17,62 +19,140 @@ settings:
     viewport: [1280, 900]
 
 sources:
-  # ---- 示例：platform 策略（占位，替换成真实公司后可用） ----
-  - key: platform-demo
-    name: "示例公司-校招(平台API)"
-    url: "https://example.com/campus"
-    strategy: platform
-    api:
-      url: "https://example.com/api/jobs"      # JSON 接口（Network 里抓）
-      method: POST
-      headers:
-        content-type: application/json
-      body: {}                                  # 静态请求体
-      page_param: "pageNo"                      # 分页参数名（query 或 body 字段）
-      page_size: 20
-      data_path: "data.jobList"                 # 列表的 JSON 路径（点分）
-      total_path: "data.total"                  # 总数（可选，用于翻页）
-    fields:
-      title: "jobName"
-      location: "workCity"
-      job_type: "jobType"
-      publish_date: "publishDate"
-      deadline: "deadline"
-      apply_url: "jobLink"
-      department: "department"
-      description: "jobDescription"
-
-  # ---- 示例：static 策略（占位） ----
-  - key: static-demo
-    name: "示例公司-校招(静态页)"
-    url: "https://example.com/jobs"
-    strategy: static
-    selectors:
-      list: "ul.job-list li"
-      title: "h3 a"
-      link: "h3 a@href"
-      location: ".loc"
-      publish_date: ".date"
-      pagination: ".pager a.next"
-      page_param: "page"
-
-  # ---- 示例：dynamic 策略，需登录（占位） ----
-  - key: login-demo
-    name: "示例公司-校招(需登录)"
-    url: "https://example.com/campus/jobs"
+  # ---- 腾讯（响应已确认：data.positionList / data.count） ----
+  - key: tencent
+    name: "腾讯校招"
+    url: "https://join.qq.com/post.html?query=p_104"
     strategy: dynamic
-    needs_login: true
-    wait_for: ".job-card"
-    selectors:
-      list: ".job-card"
-      title: ".job-title"
-      link: "a.job-link@href"
-      location: ".job-loc"
-      publish_date: ".job-date"
-    login:
-      url: "https://example.com/login"
-      username_selector: "#account"
-      password_selector: "#password"
-      submit_selector: "button.login-btn"
-      success_check: { type: url_contains, value: "/campus" }
-      error_selector: ".login-error"
+    api:
+      response_match: "searchPosition"
+      data_path: "data.positionList"
+      total_path: "data.count"
+    fields:
+      title: "positionTitle"
+      location: "workCities"
+      job_type: "recruitLabelName"
+      apply_url: "positionUrl"
+
+  # ---- 京东（响应已确认：body.items） ----
+  - key: jd
+    name: "京东校招"
+    url: "https://campus.jd.com/#/jobs?selProjects=45"
+    strategy: dynamic
+    api:
+      response_match: "position/page"
+      data_path: "body.items"
+      total_path: "body.total"
+    fields:
+      title: "positionName"
+      location: "workCity"
+      job_type: "jobDirection"
+      publish_date: "publishTime"
+
+  # ---- 字节跳动（响应已确认：data.job_post_list） ----
+  - key: bytedance
+    name: "字节跳动校招"
+    url: "https://jobs.bytedance.com/campus/position?keywords=&category=&location=&project=7194661644654577981%2C7194661126919358757&type=&job_hot_flag=&current=1&limit=10&functionCategory=&tag="
+    strategy: dynamic
+    api:
+      response_match: "search/job/posts"
+      data_path: "data.job_post_list"
+      total_path: "data.total"
+    fields:
+      title: "title"
+      location: "city_info"
+      job_type: "recruit_type"
+      publish_date: "publish_time"
+      description: "description"
+
+  # ---- 阿里巴巴（响应已确认：content.datas） ----
+  - key: alibaba
+    name: "阿里巴巴校招"
+    url: "https://campus-talent.alibaba.com/campus/position?batchId=100000560002"
+    strategy: dynamic
+    api:
+      response_match: "position/search"
+      data_path: "content.datas"
+      total_path: "content.total"
+    fields:
+      title: "name"
+      location: "workLocations"
+      publish_date: "modifyTime"
+
+  # ---- 得物（响应已确认：data.job_post_list，与字节同平台） ----
+  - key: dewu
+    name: "得物校招"
+    url: "https://campus.dewu.com/578078/position/list?keywords=&category=&location=&project=7623619302324226314%2C7309753987297167679&type=&job_hot_flag=&current=1&limit=10&functionCategory=&tag="
+    strategy: dynamic
+    api:
+      response_match: "search/job/posts"
+      data_path: "data.job_post_list"
+      total_path: "data.total"
+    fields:
+      title: "title"
+      location: "city_info"
+      job_type: "recruit_type"
+      publish_date: "publish_time"
+      description: "description"
+
+  # ---- 超聚变（响应已确认：data.result） ----
+  - key: xfusion
+    name: "超聚变校招"
+    url: "https://career.xfusion.com/OfficialPortal/#/traineeList"
+    strategy: dynamic
+    api:
+      response_match: "osPostpagelist"
+      data_path: "data.result"
+      total_path: "data.total"
+    fields:
+      title: "postName"
+
+  # ---- 拼多多（部分：捕获到的是实习项目列表 result.list，岗位细分待补） ----
+  - key: pdd
+    name: "拼多多校招"
+    url: "https://careers.pddglobalhr.com/campus/intern"
+    strategy: dynamic
+    api:
+      response_match: "position/train/list"
+      data_path: "result.list"
+      total_path: "result.total"
+    fields:
+      title: "name"
+      location: "workLocationName"
+      job_type: "recruitTypeName"
+      publish_date: "releaseTime"
+      description: "jobDuty"
+
+  # ---- 以下三家岗位 API 结构尚未完全逆向，先注册，待补充 response_match/fields ----
+  - key: meituan
+    name: "美团校招"
+    url: "https://zhaopin.meituan.com/web/campus"
+    strategy: dynamic
+    api:
+      response_match: "recruit"
+      data_path: "data.list"
+    fields:
+      title: "title"
+      location: "location"
+
+  - key: tongcheng
+    name: "同程校招"
+    url: "https://mhr.ly.com/recruit/schoolPortal/#/postDelivery?srt=0.4871249267327028"
+    strategy: dynamic
+    api:
+      response_match: "schoolJob"
+      data_path: "data.list"
+    fields:
+      title: "positionName"
+      location: "workCity"
+
+  - key: ctrip
+    name: "携程校招"
+    url: "https://job.ctrip.com/#/campus/jobList"
+    strategy: dynamic
+    api:
+      response_match: "getJobAd"
+      data_path: "data.list"
+    fields:
+      title: "title"
+      location: "city"

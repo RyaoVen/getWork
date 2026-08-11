@@ -94,6 +94,51 @@ def first_text(value: Any) -> str | None:
     return str(value).strip()
 
 
+def _date_str(v: Any) -> str | None:
+    """把 ISO 字符串或 epoch 毫秒/秒时间戳统一成 YYYY-MM-DD。"""
+    if v is None:
+        return None
+    if isinstance(v, (int, float)):
+        n = float(v)
+        if n > 1e11:
+            n /= 1000.0  # 毫秒
+        if n > 1e10:
+            n /= 1000.0  # 微秒兜底
+        try:
+            return datetime.datetime.fromtimestamp(n).strftime("%Y-%m-%d")
+        except (OverflowError, OSError, ValueError):
+            return str(v)
+    s = str(v).strip()
+    if s.isdigit() and len(s) >= 12:
+        try:
+            return datetime.datetime.fromtimestamp(int(s) / 1000).strftime("%Y-%m-%d")
+        except (OverflowError, OSError, ValueError):
+            return s
+    return s or None
+
+
+def job_from_fields(item: dict, source: Source) -> JobRecord | None:
+    """按 source.fields（字段名 → JSON 点分路径）从一条原始记录提取岗位。"""
+    fields = source.fields or {}
+    title = first_text(dig(item, fields.get("title", "title")))
+    if not title:
+        return None
+    href = first_text(dig(item, fields["apply_url"])) if fields.get("apply_url") else None
+    return JobRecord(
+        title=title,
+        company=source.name,
+        source=source.key,
+        location=first_text(dig(item, fields["location"])) if fields.get("location") else None,
+        department=first_text(dig(item, fields["department"])) if fields.get("department") else None,
+        job_type=first_text(dig(item, fields["job_type"])) if fields.get("job_type") else None,
+        publish_date=_date_str(dig(item, fields["publish_date"])) if fields.get("publish_date") else None,
+        deadline=_date_str(dig(item, fields["deadline"])) if fields.get("deadline") else None,
+        description=first_text(dig(item, fields["description"])) if fields.get("description") else None,
+        apply_url=resolve_url(source.url, href) or source.url,
+        raw=item,
+    )
+
+
 def resolve_url(base: str, href: str | None) -> str:
     from urllib.parse import urljoin, urlparse
 

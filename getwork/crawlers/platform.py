@@ -11,7 +11,7 @@ from typing import Any
 import httpx
 
 from ..models import JobRecord
-from .base import Crawler, UA, dig, first_text, resolve_url
+from .base import Crawler, UA, dig, job_from_fields
 
 
 class PlatformCrawler(Crawler):
@@ -76,21 +76,4 @@ class PlatformCrawler(Crawler):
         return jobs
 
     def _extract_item(self, item: dict) -> JobRecord | None:
-        fields = self.source.fields or {}
-        title = first_text(dig(item, fields.get("title", "title")))
-        if not title:
-            return None
-        href = first_text(dig(item, fields.get("apply_url"))) if fields.get("apply_url") else None
-        return JobRecord(
-            title=title,
-            company=self.source.name,
-            source=self.source.key,
-            location=first_text(dig(item, fields["location"])) if fields.get("location") else None,
-            department=first_text(dig(item, fields["department"])) if fields.get("department") else None,
-            job_type=first_text(dig(item, fields["job_type"])) if fields.get("job_type") else None,
-            publish_date=first_text(dig(item, fields["publish_date"])) if fields.get("publish_date") else None,
-            deadline=first_text(dig(item, fields["deadline"])) if fields.get("deadline") else None,
-            description=first_text(dig(item, fields["description"])) if fields.get("description") else None,
-            apply_url=resolve_url(self.source.url, href),
-            raw=item,
-        )
+        return job_from_fields(item, self.source)
