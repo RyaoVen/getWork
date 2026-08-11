@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+import re
 from abc import ABC, abstractmethod
 from typing import Any
 
@@ -117,13 +118,34 @@ def _date_str(v: Any) -> str | None:
     return s or None
 
 
+def _apply_url(source: Source, item: dict, field_val: Any) -> str:
+    """apply_url 支持两种形态：普通字段值，或模板字符串（含 {字段}，用 item 填充）。"""
+    if not field_val:
+        return source.url
+    s = str(field_val)
+    if "{" in s:
+        def repl(m: re.Match) -> str:
+            v = dig(item, m.group(1))
+            return first_text(v) or ""
+        return re.sub(r"\{([a-zA-Z0-9_.]+)\}", repl, s)
+    return resolve_url(source.url, s) or source.url
+
+
 def job_from_fields(item: dict, source: Source) -> JobRecord | None:
-    """按 source.fields（字段名 → JSON 点分路径）从一条原始记录提取岗位。"""
+    """按 source.fields（字段名 → JSON 点分路径）从一条原始记录提取岗位。
+
+    apply_url 支持两种形态：字段路径（如 "positionUrl"），或模板字符串（含 {字段}，
+    直接按 item 填充，如 "https://…/detail/{id}"）。
+    """
     fields = source.fields or {}
     title = first_text(dig(item, fields.get("title", "title")))
     if not title:
         return None
-    href = first_text(dig(item, fields["apply_url"])) if fields.get("apply_url") else None
+    apply_cfg = fields.get("apply_url")
+    if apply_cfg and "{" in str(apply_cfg):
+        apply_url = _apply_url(source, item, apply_cfg)
+    else:
+        apply_url = _apply_url(source, item, dig(item, apply_cfg) if apply_cfg else None)
     return JobRecord(
         title=title,
         company=source.name,
@@ -134,7 +156,8 @@ def job_from_fields(item: dict, source: Source) -> JobRecord | None:
         publish_date=_date_str(dig(item, fields["publish_date"])) if fields.get("publish_date") else None,
         deadline=_date_str(dig(item, fields["deadline"])) if fields.get("deadline") else None,
         description=first_text(dig(item, fields["description"])) if fields.get("description") else None,
-        apply_url=resolve_url(source.url, href) or source.url,
+        requirement=first_text(dig(item, fields["requirement"])) if fields.get("requirement") else None,
+        apply_url=apply_url,
         raw=item,
     )
 
