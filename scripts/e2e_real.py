@@ -20,13 +20,8 @@ async def call(session: ClientSession, name: str, args: dict) -> dict:
 
 
 def build_briefing(jobs_by_source: dict[str, list]) -> str:
-    def excerpt(s, n=110):
-        if not s:
-            return None
-        s = " ".join(s.split())
-        return s if len(s) <= n else s[:n] + "…"
-
-    lines = ["# 实习岗位日报", "", f"> 由 getWork 自动抓取生成 · 覆盖 {len(jobs_by_source)} 家公司", ""]
+    total = sum(len(j) for j in jobs_by_source.values())
+    lines = ["# 实习岗位日报", "", f"> 由 getWork 自动抓取生成 · 覆盖 {len(jobs_by_source)} 家公司 · 共 {total} 条岗位", ""]
     lines.append("## 总览")
     lines.append("")
     lines.append("| 公司 | 岗位数 | 示例岗位 |")
@@ -38,19 +33,24 @@ def build_briefing(jobs_by_source: dict[str, list]) -> str:
     for src, jobs in jobs_by_source.items():
         lines.append(f"## {NAME.get(src, src)}（{len(jobs)} 条）")
         lines.append("")
-        for j in jobs[:5]:
+        # 抓到的每一个岗位都写全，不截断
+        for j in jobs:
             lines.append(f"### {j['title']}")
             lines.append("")
-            req = excerpt(j.get('requirement')) or excerpt(j.get('description'))
+            req = (j.get("requirement") or "").strip()
             if req:
                 lines.append(f"- **要求**：{req}")
+            else:
+                desc = (j.get("description") or "").strip()
+                if desc:
+                    lines.append(f"- **描述**：{desc}")
             loc = j.get('location') or '-'
             typ = j.get('job_type') or '-'
             date = j.get('publish_date') or '-'
             lines.append(f"- 地点：{loc} · 类型：{typ} · 发布：{date}")
             lines.append(f"- [查看岗位详情]({j.get('apply_url') or '#'})")
             if not j.get('requirement'):
-                lines.append(f"> 官网未提供岗位要求，建议点上方链接到详情页查看。")
+                lines.append("> 官网未提供岗位要求，建议点上方链接到详情页查看。")
             lines.append("")
     return "\n".join(lines)
 
