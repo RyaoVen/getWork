@@ -73,11 +73,11 @@ def dig(obj: Any, dotted: str) -> Any:
 
 
 def first_text(value: Any) -> str | None:
-    """把可能为 str/list/dict 的提取值压成单条字符串。"""
+    """把可能为 str/list/dict 的提取值压成单条字符串，并去掉 HTML 标签。"""
     if value is None:
         return None
     if isinstance(value, str):
-        s = value.strip()
+        s = re.sub(r"<[^>]+>", "", value).strip()
         return s or None
     if isinstance(value, list):
         for v in value:
